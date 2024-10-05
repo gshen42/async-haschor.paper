@@ -1,0 +1,37 @@
+\documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
+
+\title{Async HasChor: Asynchronous Functional Choreographic Programming}
+
+\begin{abstract}
+Choreographic programming is a paradigm that models a distributed system as a unified program, which is then endpoint projected into individual programs for each participant.
+%
+Thanks to its global point of view, communication among participants is manifest, and they’re guaranteed to match with each other, leading to a deadlock-free-by-design construction.
+%
+However, existing choreographic programming languages assume a synchronous network model where communication blocks both sender and receiver.
+%
+This assumption not only is inefficient as it limits the amount of concurrency but also makes it impossible to express useful protocols.
+
+In this paper, we present Async HasChor, an extension that adds asynchronous communication to the library-level choreographic programming language HasChor.
+%
+The key idea is to make communication return a \emph{future} and spawn threads for sending and receiving.
+%
+One challenge of this approach is that now messages can arrive out of order, and if not dealt correctly can lead to serious bugs at run time.
+%
+To overcome the challenge, we tag each message with a sequence number and argument endpoint projection to automatically generate these numbers consistently among participants.
+%
+We evaluate Async HasChor ...
+%
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+\input{0-intro}
+\input{1-tour}
+\input{2-formal}
+\input{3-impl}
+\input{4-case}
+\input{5-related}
+\input{6-conclu}
+
+\end{document}
