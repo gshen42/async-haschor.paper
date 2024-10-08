@@ -1,1 +1,63 @@
 \section{Introduction}
+
+Choreographic programming is a paradigm for programming distributed systems that run on multiple nodes.
+%
+In choreographic programming, the programmer writes one, unified program --- called a \emph{choreography} --- which defines the entire behavior of a distributed system.
+%
+The choreography is then \emph{endpoint projected} to individual programs for each node.
+%
+For example, the following choreography defines a distributed data processing pipeline, where a piece of data is passed around among nodes Alice, Bob, and Carol, with each applying their respective processing function \texttt{f}, \texttt{g}, and \texttt{h} to the data:~\footnote{The code is written in pseudo Async HasChor, the exact syntax and semantics of each operator will be detailed in \Cref{sec:tour}.}
+
+\begin{figure}[h]
+\centering
+\begin{minipage}{0.4\textwidth}
+\begin{minted}{haskell}
+pipeline = do
+  x <- locally @Alice getData
+  y <- comm @Alice @Bob   (f x)
+  z <- comm @Bob   @Carol (g y)
+  w <- comm @Carol @Alice (h z)
+  locally @Alice (showResult w)
+\end{minted}
+\end{minipage}
+\end{figure}
+
+\noindent Endpoint projection will generate the following three individual programs for Alice, Bob, and Carol:
+
+\begin{figure}[h]
+\hspace{1cm}
+\begin{minipage}[t]{0.3\textwidth}
+\begin{minted}{haskell}
+alice = do
+  x <- getData
+  send @Bob (f x)
+  w <- recv @Carol
+  showResult w
+\end{minted}
+\end{minipage}
+\begin{minipage}[t]{0.3\textwidth}
+\begin{minted}{haskell}
+bob = do
+  y <- recv @Alice
+  send @Carol (g y)
+\end{minted}
+\end{minipage}
+\begin{minipage}[t]{0.3\textwidth}
+\begin{minted}{haskell}
+carol = do
+  z <- recv @Bob
+  send @Alice (h z)
+\end{minted}
+\end{minipage}
+\end{figure}
+
+Thanks to its global point of view, choreography makes communication among nodes manifest, and they are guaranteed to match with each other, leading to a deadlock-free-by-design construction.
+%
+In the last decade, several choreographic programming languages have been proposed.
+%
+More rencently, \emph{library-level} choreographic programming, which embeds choreographic programming in a host language and thus provides a lightweight way to bring choreographic programming to existing languages, have begun to emerge.
+
+Despite these developments, existing choreographic programming languages often assume an model where the underlying network is lossless and synchronous.
+%
+This assumption (1) makes it impossible to program against message loss or delay, and (2) limits the amount of concurrency as both sender and receiver will be blocked by an instance of communication.
+%

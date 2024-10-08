@@ -1,5 +1,3 @@
-.DEFAULT_GOAL := default
-
 LATEXMK_ARGS :=
 # -xelatex runs the TeX files through XeLaTeX instead of regular LaTeX
 LATEXMK_ARGS += -xelatex
@@ -21,8 +19,4 @@ default:
 
 .PHONY: clean
 clean:
-	${LATEXMK} -c
-
-.PHONY: cleanall
-cleanall:
-	${LATEXMK} -C
+	rm -rf build
