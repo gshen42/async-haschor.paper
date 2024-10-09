@@ -60,4 +60,44 @@ More rencently, \emph{library-level} choreographic programming, which embeds cho
 Despite these developments, existing choreographic programming languages often assume an model where the underlying network is lossless and synchronous.
 %
 This assumption (1) makes it impossible to program against message loss or delay, and (2) limits the amount of concurrency as both sender and receiver will be blocked by an instance of communication.
+
+To address these issues, we propose a new choreographic programming model that supports asynchronous communication.
 %
+Our model incorporates \emph{futures}---a placeholder for a value that will be available in the future---into choreographic programming.
+%
+We make each communication return a future to represent a yet-to-arrive message.
+%
+A node can wait on a future, and if the corresponding message has arrived, the carried value will be immediately available for use;
+%
+if the message has not arrived, the node's execution will be blocked.
+%
+Futures allow a node to perform a series of communication, and all of them will be executed in parallel, a technique known as
+Even better, a node can perform other tasks while futures are being resolved in the background:
+%
+it can perform more communication, and all of the message passing will be executed in parallel, reducing network latency;
+%
+it can also wait on
+%
+With the new future-based communication, prorammers can now express distributed protocols that were impossible before.
+
+We implment our language Async HasChor as an extention to the library-level choreographic programming language HasChor.
+%
+To evaluate the Async HasChor,
+
+\vspace{0.5cm}
+\noindent \textit{\textbf{Contributions.}} The paper makes the following contributions:
+
+\begin{itemize}
+\item
+    We examine the issues with synchronous communication in choreographic programming and the challenge of making them asynchronous~(\Cref{sec:motiv}).
+\item
+    We introduce Async HasChor, a choreographic programming language that uses asynchronous communication, empowering programmers to describe distributed protocols previously impossible~(\Cref{sec:tour}).
+\item
+    We present a formal model of Async HasChor and its endpoint projection that handles out-of-order messages with sequence numbers~(\Cref{sec:formal}).
+\item
+    Following HasChor, we implement Async HasChor as a library-level choreographic langauge in Haskell using freer monads~(\Cref{sec:formal}).
+\item
+    We evaluate
+\end{itemize}
+
+\noindent We discuss related work in \Cref{sec:related} and conclude in \Cref{sec:conclu}.
