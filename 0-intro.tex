@@ -1,10 +1,10 @@
 \section{Introduction}
 
-Choreographic programming is a paradigm for programming distributed systems that run on multiple nodes.
+Choreographic programming~\citep{montesi-thesis, montesi-textbook} is a paradigm for programming distributed systems that run on multiple nodes.
 %
 In choreographic programming, the programmer writes one, unified program --- called a \emph{choreography} --- which defines the entire behavior of a distributed system.
 %
-The choreography is then \emph{endpoint projected} to individual programs for each node.
+The choreography is then compiled to individual programs for each node through a process called \emph{endpoint projection}.
 %
 For example, the following choreography defines a distributed data processing pipeline, where a piece of data is passed around among nodes Alice, Bob, and Carol, with each applying their respective processing function \texttt{f}, \texttt{g}, and \texttt{h} to the data:~\footnote{The code is written in pseudo Async HasChor, the exact syntax and semantics of each operator will be detailed in \Cref{sec:tour}.}
 
@@ -51,53 +51,74 @@ carol = do
 \end{minipage}
 \end{figure}
 
-Thanks to its global point of view, choreography makes communication among nodes manifest, and they are guaranteed to match with each other, leading to a deadlock-free-by-design construction.
+Thanks to its global point of view, choreographies make communications among nodes manifest, and they are guaranteed to match with each other, leading to a deadlock-free-by-design construction~\citep{deadlock-free-by-design}.
 %
-In the last decade, several choreographic programming languages have been proposed.
+In the last decade, several choreographic programming languages have been proposed~\citep{aiocj, choral, pirouette}.
 %
-More rencently, \emph{library-level} choreographic programming, which embeds choreographic programming in a host language and thus provides a lightweight way to bring choreographic programming to existing languages, have begun to emerge.
+More rencently, \emph{library-level} choreographic programming, which embeds choreographic programming in a host language and thus provides a lightweight way to bring choreographic programming to existing languages, have begun to emerge~\citep{haschor, chorus}.
 
-Despite these developments, existing choreographic programming languages often assume an model where the underlying network is lossless and synchronous.
+Despite these developments, existing choreographic programming languages often assume an unrealistic model where the underlying network is synchronous and lossless.
 %
-This assumption (1) makes it impossible to program against message loss or delay, and (2) limits the amount of concurrency as both sender and receiver will be blocked by an instance of communication.
+This assumption significantly litmits the efficiency and expressiveness of a choreography:
+%
+(1) a communication would block both the sender and receiver, preventing them from performing other tasks and recuding concurrency;
+%
+(2) it is impossible to handle message delay and loss, which are ubiquitous and challenging in distributed system programming.
+%
+Previous work addresses some of these issues, but it is either unwieldy or suffers from other problems, which we discuss in more detail in \Cref{sec:related}.
 
-To address these issues, we propose a new choreographic programming model that supports asynchronous communication.
+In this paper, we introduce a new choreographic programming model that supports asynchronous communication and develop \emph{Async HasChor}, a library-level choreographic programming language in Haskell that implemnts our model.
 %
-Our model incorporates \emph{futures}---a placeholder for a value that will be available in the future---into choreographic programming.
+Async HasChor incorporates \emph{futures} --- a placeholder for a value that will be available in the future --- into choreographic programming.
 %
-We make each communication return a future to represent a yet-to-arrive message.
+It makes each communication return a future to represent a yet-to-arrive message.
 %
 A node can wait on a future, and if the corresponding message has arrived, the carried value will be immediately available for use;
 %
 if the message has not arrived, the node's execution will be blocked.
 %
-Futures allow a node to perform a series of communication, and all of them will be executed in parallel, a technique known as
-Even better, a node can perform other tasks while futures are being resolved in the background:
+A node can also perform a series of communications and wait for their results.
 %
-it can perform more communication, and all of the message passing will be executed in parallel, reducing network latency;
+This allows message passings to be executed in parallel, reducing network latency.
 %
-it can also wait on
+Furthermore, a node can wait on a quorum of results and makes a decision based on that.
 %
-With the new future-based communication, prorammers can now express distributed protocols that were impossible before.
+This allows the system to tolerate network or machine failure while maintaining consistency.
 
-We implment our language Async HasChor as an extention to the library-level choreographic programming language HasChor.
+Async HasChor enables programmers to express distributed protocols that were impossible before, but it also introduces significant challenges to endpoint projection.
 %
-To evaluate the Async HasChor,
+In addition to using asynchronous sending and receiving in network programs, endpoint projection must also handle out-of-order messages.
+%
+Otherwise, a message could be assigned to the wrong variable, breaking the safety guarantees and leading to catastrophic consequences.
+%
+Following standard practice, we attach a sequence number to each message to help the receiver distinguish between them.
+%
+Once again, we leverage the global perspective provided by a choreography to generate these sequence numbers \emph{automatically} and \emph{consistently} during endpoint projection.
+
+Following HasChor, Async HasChor is built on top of freer monads and offers a monadic interface for choreographic programming.
+%
+Endpoint projection is straightforwardly implemented by interpreting the effects in a freer monad based on a projection target.
+%
+We piggyback on the host language, Haskell, to provide an asynchronous runtime for executing futures, so we do not have to build our own.
+%
+We believe our model is general and can be implemented by different approaches in other languages.
+
+To evaluate Async HasChor, we...
 
 \vspace{0.5cm}
 \noindent \textit{\textbf{Contributions.}} The paper makes the following contributions:
-
+%
 \begin{itemize}
 \item
-    We examine the issues with synchronous communication in choreographic programming and the challenge of making them asynchronous~(\Cref{sec:motiv}).
+    We examine the issues with synchronous communication in choreographic programming and the challenges of making them asynchronous~(\Cref{sec:motiv}).
 \item
-    We introduce Async HasChor, a choreographic programming language that uses asynchronous communication, empowering programmers to describe distributed protocols previously impossible~(\Cref{sec:tour}).
+    We introduce Async HasChor, a choreographic programming language that supports asynchronous communication, empowering programmers to express distributed protocols previously impossible~(\Cref{sec:tour}).
 \item
-    We present a formal model of Async HasChor and its endpoint projection that handles out-of-order messages with sequence numbers~(\Cref{sec:formal}).
+    We present a formal model of Async HasChor and a proof of deadlock freedom~(\Cref{sec:formal}).
 \item
-    Following HasChor, we implement Async HasChor as a library-level choreographic langauge in Haskell using freer monads~(\Cref{sec:formal}).
+    We implement Async HasChor as a library-level choreographic langauge in Haskell using freer monads~(\Cref{sec:impl}).
 \item
-    We evaluate
+    We evaluate Async HasChor...~(\Cref{sec:eval})
 \end{itemize}
-
-\noindent We discuss related work in \Cref{sec:related} and conclude in \Cref{sec:conclu}.
+%
+We discuss related work in \Cref{sec:related} and conclude in \Cref{sec:conclu}.

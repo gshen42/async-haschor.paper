@@ -1,5 +1,8 @@
 \documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
 
+\setcitestyle{nosort}
+\citestyle{acmauthoryear}
+
 \usepackage[outputdir=build]{minted}
 \usemintedstyle{borland}
 
@@ -39,5 +42,8 @@ We evaluate Async HasChor ...
 \input{5-eval}
 \input{6-related}
 \input{7-conclu}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
 
 \end{document}
