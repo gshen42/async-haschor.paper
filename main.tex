@@ -8,7 +8,7 @@
 
 \usepackage{cleveref}
 
-\title{Async HasChor: Asynchronous Functional Choreographic Programming}
+\title{Async HasChor: Functional Asynchronous Choreographic Programming}
 
 \begin{abstract}
 Choreographic programming is a paradigm that models a distributed system as a unified program, which is then endpoint projected into individual programs for each participant.
@@ -19,7 +19,7 @@ However, existing choreographic programming languages assume a synchronous netwo
 %
 This assumption not only is inefficient as it limits the amount of concurrency but also makes it impossible to express useful protocols.
 
-In this paper, we present Async HasChor, an extension that adds asynchronous communication to the library-level choreographic programming language HasChor.
+In this paper, we present Async HasChor, an extension that adds asynchronous communication to the library-level functional choreographic programming language HasChor.
 %
 The key idea is to make communication return a \emph{future} and spawn threads for sending and receiving.
 %
