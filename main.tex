@@ -4,7 +4,15 @@
 \citestyle{acmauthoryear}
 
 \usepackage[outputdir=build]{minted}
+% shorthand for inline code
+\newcommand{\hs}[1]{\mintinline{haskell}{#1}}
 \usemintedstyle{borland}
+% the following code create a `cminted' environment that centers a minted code block
+% taken from https://tex.stackexchange.com/questions/161124/how-to-make-a-minted-code-listing-centered-on-a-page
+\usepackage{xpatch,letltxmacro}
+\LetLtxMacro{\cminted}{\minted}
+\let\endcminted\endminted
+\xpretocmd{\cminted}{\RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}}{}{}
 
 \usepackage{cleveref}
 

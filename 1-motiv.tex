@@ -1,2 +1,24 @@
 \section{Motivation and Challenges}
 \label{sec:motiv}
+
+In this section, we examine the issues with synchronous communications in current choreographic programming languages and briefly present our asynchronous extension along with its related challenges.
+
+\subsection{Issues with Synchronous Communications}
+
+Existing choreographic programming languages often assume a synchronous communication model~\citep{pirouette, choral, chor-lambda}, where both the sender and receiver are blocked until the communication is complete.
+%
+The synchronous behavior is evident from the type signature of the communication operator:~\footnote{Again, using pseudo Async HasChor syntax here. Full definition in \Cref{sec:tour}}
+
+\begin{figure}[h]
+\begin{cminted}{haskell}
+comm :: forall (s :: Loc) (r :: Loc). a @ s -> Choreo (a @ r)
+\end{cminted}
+\end{figure}
+
+\noindent \texttt{comm} takes a sender and receiver location and moves a value from the sender (\hs{a @ s}) to the receiver (\hs{a @ r}) in the \hs{Choreo} monad.
+%
+
+
+\subsection{Bring Choreographic Programming into the Future}
+
+\subsection{Get the Right Message}
