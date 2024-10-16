@@ -1,11 +1,11 @@
 \section{Motivation and Challenges}
 \label{sec:motiv}
 
-In this section, we examine the issues with synchronous communications in current choreographic programming languages and briefly present our asynchronous extension along with its related challenges.
+In this section, we examine the issues with synchronous communications in current choreographic programming languages and briefly present our asynchronous extension along with its challenges.
 
 \subsection{Issues with Synchronous Communications}
 
-Existing choreographic programming languages often assume a synchronous communication model~\citep{pirouette, choral, chor-lambda}, where both the sender and receiver are blocked until the communication is complete.
+Existing choreographic programming languages often assume a synchronous communication model~\citep{CC, chor-lambda, pirouette}.
 %
 The synchronous behavior is evident from the type signature of the communication operator:~\footnote{Again, using pseudo Async HasChor syntax here. Full definition in \Cref{sec:tour}}
 
@@ -17,7 +17,40 @@ comm :: forall (s :: Loc) (r :: Loc). a @ s -> Choreo (a @ r)
 
 \noindent \texttt{comm} takes a sender and receiver location and moves a value from the sender (\hs{a @ s}) to the receiver (\hs{a @ r}) in the \hs{Choreo} monad.
 %
+The value is immediately usable at the receiver, indicating the communication has completed.
+%
+While easy to reason about and simple to implement, synchronous communication significantly restricts the efficiency and expressivity of a choreography:
 
+First, it limits the amount of concurrency a choreography can have since both the sender and receiver are blocked until the communication is completed.
+%
+For example, the data splitting phase of a MapReduce-like~\citep{map-reduce} system can be represented as the following choreography:
+
+\begin{figure}[h]
+\begin{cminted}{haskell}
+split bigData = do
+  comm @Leader @Worker1 (partition bigData 3)
+  comm @Leader @Worker2 (partition bigData 3)
+  comm @Leader @Worker3 (partition bigData 3)
+\end{cminted}
+\end{figure}
+
+\noindent The code clearly expresses the functionality of the application.
+%
+However, the performance is suboptimal as all the communications are executed sequentially, making the total completion time is the \emph{sum} of all network requests.
+%
+This becomes particularly problematic when dealing with data in big size.
+%
+Ideally, we want to exploit concurrency and overlap these communications.
+
+Second, the synchronous assumption makes it impossible to handle message delays and losses, which are very common in distributed systems and crucial for achieving fault tolerance.
+%
+For example, a distributed key-value store would have a primary server that interacts with the client and a set of replicas to reduce the risk of data loss and improve availability.
+%
+To update a key-value pair, the primary only needs to receive a \emph{quorum} of acknowledgements, rather than waiting for responses from all replicas.
+%
+This allows the system to continue functioning even if some replicas fail or parts of the network are unavailable, while still maintaining consistency.
+
+Some extentions...
 
 \subsection{Bring Choreographic Programming into the Future}
 
