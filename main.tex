@@ -16,27 +16,26 @@
 
 \usepackage{cleveref}
 
-\title{Async HasChor: Functional Asynchronous Choreographic Programming}
+\title{Async HasChor: Library-Level Fully Asynchronous Choreographic Programming}
 
 \begin{abstract}
 Choreographic programming is a paradigm that models a distributed system as a unified program, which is then endpoint projected into individual programs for each participant.
 %
-Thanks to its global point of view, communication among participants is manifest, and they’re guaranteed to match with each other, leading to a deadlock-free-by-design construction.
+Thanks to its global point of view, communications among participants are manifest and guaranteed to match on both ends, resulting in a deadlock-free-by-design construction.
 %
-However, existing choreographic programming languages assume a synchronous network model where communication blocks both sender and receiver.
+However, existing choreographic programming models lack sufficient support for asynchronous communication, as they block the receiver.
 %
-This assumption not only is inefficient as it limits the amount of concurrency but also makes it impossible to express useful protocols.
+This limitation makes it impossible to express useful protocols that handle network failures.
 
-In this paper, we present Async HasChor, an extension that adds asynchronous communication to the library-level functional choreographic programming language HasChor.
+In this paper, we introduce a new choreographic programming model that supports \emph{fully} asynchronous communication, and implement it as Async HasChor, a library in Haskell.
 %
-The key idea is to make communication return a \emph{future} and spawn threads for sending and receiving.
+The key idea is to make each communication return a \emph{future} and execute each sending and receiving in a separate thread.
 %
-One challenge of this approach is that now messages can arrive out of order, and if not dealt correctly can lead to serious bugs at run time.
+One challenge of this approach is that messages can now arrive out of order, and if not handled correctly, can lead to serious bugs at run time.
 %
-To overcome the challenge, we tag each message with a sequence number and argument endpoint projection to automatically generate these numbers consistently among participants.
+To address this challenge, we tag each message with a sequence number and extend endpoint projection to automatically generate these numbers consistently among participants.
 %
-We evaluate Async HasChor ...
-%
+We evaluate Async HasChor by implementing a Paxos-like consensus algorithm.
 \end{abstract}
 
 \begin{document}
