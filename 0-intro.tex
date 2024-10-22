@@ -6,33 +6,52 @@ In choreographic programming, the programmer writes one, unified program --- cal
 %
 The choreography is then compiled to individual programs for each node through a process called \emph{endpoint projection}.
 %
-For example, the following choreography defines a distributed data processing pipeline, where a piece of data is passed around among nodes Alice, Bob, and Carol, with each applying their respective processing function \texttt{f}, \texttt{g}, and \texttt{h} to the data:~\footnote{The code is written in pseudo Async HasChor, the exact syntax and semantics of each operator will be detailed in \Cref{sec:tour}.}
+For example, the choreography in \Cref{fig:pipeline} defines a distributed data processing pipeline:~\footnote{The code is written in Async HasChor with some uninteresting details omitted. We enable the \texttt{LambdaCase} GHC extension, which allows using \hs{\case} to define a function that immediately pattern matches on its argument.}  
+%
+a piece of data is read at Alice, passed around among Alice, Bob, and Carol, with each applying their respective processing function \texttt{f}, \texttt{g}, and \texttt{h} to the data, and output at Carol;
+%
+the choreography repeats if there is more data to process.
 
 \begin{figure}[h]
 \centering
-\begin{minipage}{0.4\textwidth}
-\begin{minted}{haskell}
-pipeline = do
-  x <- locally @Alice getData
-  y <- comm @Alice @Bob   (f x)
-  z <- comm @Bob   @Carol (g y)
-  w <- comm @Carol @Alice (h z)
-  locally @Alice (showResult w)
+\begin{minipage}{0.5\textwidth}
+\begin{minted}[autogobble]{haskell}
+  pipeline :: Choreo ()
+  pipeline = do
+    x <- locally @Alice getInput
+    y <- comm @Alice @Bob   (f x)
+    z <- comm @Bob   @Carol (g y)
+    locally @Carol (showOutput (h z))
+
+    cond @Alice haveMore \case 
+      True -> return ()
+      False -> pipeline
 \end{minted}
 \end{minipage}
+\caption{A choreography for a distributed data processing pipeline}
+\label{fig:pipeline}
 \end{figure}
 
-\noindent Endpoint projection will generate the following three individual programs for Alice, Bob, and Carol:
+The \hs{pipeline} choreography showcases the three core operators of choreographic programming: \hs{locally} for local computations, \hs{comm} for communicating data, and \hs{cond} for conditional execution.
+%
+Applying endpoint projection to the \hs{pipeline} choreography for Alice, Bob, and Carol will generate the three individual network programs respectively in \Cref{fig:pipeline-epp}.
+%
+Note that although the original choreography is expressed sequentially, the generated individual programs will run in parallel, with each node processing the next batch of data without waiting for the downstream nodes.
 
-\begin{figure}[h]
+\begin{figure}[t]
 \hspace{1cm}
 \begin{minipage}[t]{0.3\textwidth}
 \begin{minted}{haskell}
 alice = do
-  x <- getData
+  x <- getInput
   send @Bob (f x)
-  w <- recv @Carol
-  showResult w
+
+  t <- haveMore
+  send @Bob   t 
+  send @Carol t
+  case t of
+    True -> return ()
+    False -> alice
 \end{minted}
 \end{minipage}
 \begin{minipage}[t]{0.3\textwidth}
@@ -40,20 +59,32 @@ alice = do
 bob = do
   y <- recv @Alice
   send @Carol (g y)
+
+  t <- recv @Alice 
+  case t of 
+    True -> return ()
+    False -> bob
 \end{minted}
 \end{minipage}
 \begin{minipage}[t]{0.3\textwidth}
 \begin{minted}{haskell}
 carol = do
   z <- recv @Bob
-  send @Alice (h z)
+  showOutput (h z)
+
+  t <- recv @Bob
+  case t of
+    True -> return ()
+    False -> carol
 \end{minted}
 \end{minipage}
+\caption{Individual network programs generated from the \hs{pipeline} choreography}
+\label{fig:pipeline-epp}
 \end{figure}
 
-Thanks to its global point of view, choreographies make communications among nodes manifest, and they are guaranteed to match with each other, leading to a deadlock-free-by-design construction~\citep{deadlock-free-by-design}.
+Choreographies, with their global point of view, make communication among nodes manifest and guaranteed to match on both ends, resutling in a a deadlock-free-by-design construction~\citep{deadlock-free-by-design}.
 %
-In the last decade, several choreographic programming languages have been proposed~\citep{aiocj, choral, pirouette, CC, chor-lambda}.
+In the last decade, several choreographic programming languages have been proposed~\citep{aiocj, choral, pirouette, CC, chor-lambda}, and they have been applied to build real-world protocols such as IRC~\citep{irc}.
 %
 More rencently, \emph{library-level} choreographic programming, which embeds choreographic programming in a host language and thus provides a lightweight way to bring choreographic programming to existing languages, have begun to emerge~\citep{haschor, chorus}.
 
@@ -63,7 +94,7 @@ This assumption significantly litmits the efficiency and expressiveness of a cho
 %
 (1) a communication would block both the sender and receiver, preventing them from performing other tasks and recuding concurrency;
 %
-(2) it is impossible to handle message delay and loss, which are ubiquitous and challenging in distributed system programming.
+(2) it is impossible to handle message delays and losses, which are ubiquitous and challenging in distributed system programming.
 %
 Previous work addresses some of these issues, but it is either unwieldy or suffers from other problems, which we discuss in more detail in \Cref{sec:related}.
 
@@ -103,22 +134,18 @@ We piggyback on the host language, Haskell, to provide an asynchronous runtime f
 %
 We believe our model is general and can be implemented by different approaches in other languages.
 
-To evaluate Async HasChor, we...
-
-\vspace{0.5cm}
+\vspace{10pt}
 \noindent \textit{\textbf{Contributions.}} The paper makes the following contributions:
 %
 \begin{itemize}
 \item
-    We examine the issues with synchronous communication in choreographic programming and the challenges of making them asynchronous~(\Cref{sec:motiv}).
+    We examine the issues with synchronous communication in choreographic programming, the challenges of making them asynchronous, and our solution based on sequence numbers~(\Cref{sec:motiv}).
 \item
-    We introduce Async HasChor, a choreographic programming language that supports asynchronous communication, empowering programmers to express distributed protocols previously impossible~(\Cref{sec:tour}).
+    We give a tour of Async HasChor, our choreographic programming language that supports asynchronous communication, and show it enpowers programms to express distributed protocols previously impossible~(\Cref{sec:tour}).
 \item
-    We present a formal model of Async HasChor and a proof of deadlock freedom~(\Cref{sec:formal}).
+    We implement Async HasChor as a library-level choreographic language in Haskell, using freer monads with sequence numbers automatically generated during endpoint projection.(\Cref{sec:impl}).
 \item
-    We implement Async HasChor as a library-level choreographic langauge in Haskell using freer monads~(\Cref{sec:impl}).
-\item
-    We evaluate Async HasChor...~(\Cref{sec:eval})
+    We present a formal model of Async HasChor and sketch a proof of deadlock freedom~(\Cref{sec:formal}).
 \end{itemize}
 %
 We discuss related work in \Cref{sec:related} and conclude in \Cref{sec:conclu}.
