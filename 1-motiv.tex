@@ -1,78 +1,84 @@
 \section{Motivation and Challenges}
 \label{sec:motiv}
 
-In this section, we examine the issues with synchronous communications in choreographic programming languages and give a high-level overview of our extension and its challenge.
+In this section, we examine the issues with synchronous communication in choreographic programming and give a high-level overview of our extension and its challenge.
 %
-We use Async HaChor for examples but omit some uninteresting details.
+We use Async HasChor for examples in this section, omitting some uninteresting details for clarity.
 
-\subsection{Issues with Synchronous Communications}
+\subsection{Issues with Synchronous Communication}
 
-Existing choreographic programming languages often assume a model where communications are synchronous~\citep{CC, chor-lambda, pirouette}.
+In a choreography with synchronous communication, both the sender and receiver are blocked during a communication.
 %
-The synchronous behavior is evident from the type signature of the communication operator:
+This synchronous behavior is evident from the type signature of the communication operator:
 %
 \begin{minted}{haskell}
-  comm :: forall (s :: Loc) (r :: Loc). a @ s -> Choreo (a @ r)
+        comm :: forall (s :: Loc) (r :: Loc). a @ s -> Choreo (a @ r)
 \end{minted}
 %
-\texttt{comm} takes a sender and receiver location and moves a value from the sender (\hs{a @ s}) to the receiver (\hs{a @ r}) in the \hs{Choreo} monad.
+\hs{comm} takes a sender and receiver location and transmits a value from the sender (\hs{a @ s}) to the receiver (\hs{a @ r}) in the \hs{Choreo} monad.
 %
-The value is immediately usable at the receiver, indicating the communication has completed.
+The value is readily available to the receiver, indicating that the communication has completed.
 %
-While easy to reason about and simple to implement, synchronous communication significantly restricts the efficiency and expressivity of a choreography:
-%
-\begin{itemize}
-  \item
-  \textbf{Issue 1.} The synchronous assumption limits the amount of concurrency a choreography can have since both the sender and receiver are blocked until the communication is completed.
-  %
-  For example, the data splitting phase of a MapReduce-like~\citep{map-reduce} system can be represented as the following choreography:
-  %
-  \begin{minted}{haskell}
-  split = \bigData -> do
-    (c1, c2, c3) <- locally @Leader (partition bigData 3)
-    comm @Leader @Worker1 c1
-    comm @Leader @Worker2 c2
-    comm @Leader @Worker3 c3
-  \end{minted}
-  %
-  The \texttt{split} choreography takes in some data at the leader, partitions it into chunks, and distributes them across three workers.  
-  %
-  The code clearly expresses the functionality of the application.
-  %
-  However, the performance is suboptimal as all the communications are executed sequentially, making the total completion time the \emph{sum} of all network requests.
-  %
-  This becomes particularly problematic when dealing with data in big size.
-  %
-  Ideally, we want to exploit concurrency and overlap these communications.
+While straightforward to reason about and simple to implement, synchronous communication greatly limits the efficiency and expressivity of a choreography.
 
-  \item
-  \textbf{Issue 2.} The synchronous assumption makes it impossible to handle message losses or machine crashes, which are very common in distributed systems and crucial for achieving fault tolerance.
-  %
-  For example, consider a simplified president election protocol where a candidate needs a \emph{quorum} of yes votes (usually a majority) from voters A, B, and C to get elected.
-  %
-  It might be tempting to define the protocol as the following choroegraphy:
-  %
-  \begin{minted}{haskell}
-  election = do
-    a <- comm @VoterA @Candidate vote
-    b <- comm @VoterB @Candidate vote
-    c <- comm @VoterC @Candidate vote
-    passed <- locally @Candidate (checkMajority a b c)
-    cond passed $ \case
-      True  -> locally @Candidate (putStrLn "I win :-)")
-      False -> election
-  \end{minted}    
-  %
-  The \texttt{election} choreography starts with each voter sending their newly generated vote to the candidate~\footnote{The actual code needs to use \texttt{comm'} here since \texttt{vote} is stateful.}, and then the candidate checks locally if they have received a majority of yes votes.
-  %
-  If true, the candidate delcares their victory; otherwise, the election is held again.
-  %
-  The election should be able conclude even if a voter is unavailable.
-  %
-  However, the execution of \texttt{checkMajority} requires all votes to be received as it is blocked by the three proceeding \texttt{comm}.
-  %
-  So, if voter A is down or the network to it is significantly delayed, the candidate can not be elected even if the other two vote yes.
-\end{itemize}
+\textit{\textbf{Issue 1.}} The synchronous assumption limits the amount of concurrency in a choreography, as it prevents messages from being sent in parallel.
+%
+For example, we can represent the data partitioning phase of a MapReduce-like~\citep{map-reduce} system as a choreography in \Cref{fig:partition}.
+%
+The \hs{partition} choreography takes in some data at the leader, splits it into chunks, and distributes them across three workers.  
+%
+The code clearly expresses the functionality of the application.
+%
+However, the performance is suboptimal as all the communications are executed sequentially, making the total completion time the \emph{sum} of all network requests.
+%
+This becomes particularly problematic when dealing with data in big size.
+%
+Ideally, we want to exploit concurrency and overlap these communications.
+
+\begin{figure}[th]
+  \begin{minted}[autogobble]{haskell}
+    partition :: (Data @ Ld) -> Choreo (Data @ Wk1, Data @ Wk2, Data @ Wk3)
+    partition bigData = do
+      (c1, c2, c3) <- locally @Leader (split bigData 3)
+      x <- comm @Ld @Wk1 c1
+      y <- comm @Ld @Wk2 c2
+      z <- comm @Ld @Wk3 c3
+      return (x, y, z)
+  \end{minted}
+  \caption{A choreography for data partitioning}
+  \label{fig:partition}
+\end{figure}
+  
+\begin{figure}[th]
+  \begin{minted}[autogobble]{haskell}
+    election = do
+      a <- comm @VoterA @Candidate vote
+      b <- comm @VoterB @Candidate vote
+      c <- comm @VoterC @Candidate vote
+      passed <- locally @Candidate (checkMajority a b c)
+      cond passed $ \case
+        True  -> locally @Candidate (putStrLn "I win :-)")
+        False -> election
+  \end{minted}
+  \caption{A choreography for president election}
+  \label{fig:election}
+\end{figure}
+
+\textit{\textbf{Issue 2.}} The synchronous assumption makes it impossible to handle message losses or machine crashes, which are very common in distributed systems and crucial for achieving fault tolerance.
+%
+For example, consider a simplified president election protocol where a candidate needs a \emph{quorum} (usually a majority) of yes votes from voters A, B, and C to get elected.
+%
+It might be tempting to define the protocol as a choreography in \Cref{fig:election}.
+%
+The \hs{election} choreography starts with each voter sending their newly generated vote to the candidate~\footnote{The actual code needs to use \hs{comm'} here since \hs{vote} has side effects.}, and then the candidate checks locally if they have received a majority of yes votes.
+%
+If true, the candidate delcares their victory; otherwise, the election is held again.
+%
+The election should be able conclude even if a voter is unavailable.
+%
+However, the execution of \hs{checkMajority} requires all votes to be received as it is blocked by the three proceeding \hs{comm}.
+%
+So, if voter A is down or the network to it is significantly delayed, the candidate can not be elected even if the other two vote yes.
 
 Some choreographic programming models relax the synchronous assumption by creating a new thread for each message send, as seen in the asynchronous extension in \citet{montesi-textbook}.
 %
@@ -82,22 +88,40 @@ We propose making both sending and receiving non-blocking.
 
 \subsection{Bring Choreographic Programming into the Future}
 
-To make both sending and receiving non-blocking, we create a new thread for both each message send and receive and use a \emph{future} to represent the yet-to-arrive message.
+We extend choreographic programming with fully asynchronous communication.
 %
-On the interface level, this amounts to changing the type signature of \texttt{comm} to return an \emph{Async} (Haskell's equivalent of a future):
+In our extension, both the sender and receiver can move on to the next instruction while the communication is still in progress.
+%
+We implement this behavior by creating lightweight, user-level threads for each message send and receive in network programs and using a \emph{future} to represent the yet-to-arrive message.
+%
+On the interface level, this amounts to changing the type signature of \hs{comm} to return an \hs{Async} (Haskell's equivalent of a future) at the receiver:
 %
 \begin{minted}{haskell}
   comm :: forall (s :: Loc) (r :: Loc). a @ s -> Choreo (Async a @ r)
 \end{minted}
 %
-Now a call of \texttt{comm} will immediately return and perform the communication asynchronously in the background.
+Now, a call to \hs{comm} returns immediately for both the sender and receiver, with the communication taking place in the background.
 %
-The \texttt{Async} type comes with a group of wait functions, such as \texttt{wait}, \texttt{waitBoth}, and \texttt{waitAny}, to retrive the result of it under different conditions.
+The \hs{Async} type comes with a group of wait functions, such as \hs{wait}, \hs{waitBoth}, and \hs{waitAny}, to retrive the result of it under different conditions.
+%
+We can recover the original synchronous behavior by using a \hs{comm} followed by a \hs{wait}:
+%
+\begin{minted}{haskell}
+  commSync :: forall (s :: Loc) (r :: Loc). a @ s -> Choreo (a @ r)
+  commSync a = do
+    fut <- comm @s @r a
+    locally @r (wait fut)
+\end{minted}
 %
 Thanks to the fact that Async HasChor is a library-level language, we do not need to write our own asynchronus runtime and can piggyback on the off-the-shelf \texttt{async} package from Haskell.
 
-With the help of \texttt{Async}, we can now implement the \texttt{checkMajor} funciton in the \texttt{election} protocol as:
+Using \hs{Async}, we can now implement the \hs{checkMajority} function with the intended behavior as in \Cref{fig:check-majority}.
 %
+The code use \hs{waitAnyExcept} to retrive a newly available \hs{Async}.
+%
+If the first two \hs{Async}s form a majority, the function returns immediately; otherwise, it waits for the third \hs{Async} to break the tie.
+
+\begin{figure}[th]
 \begin{minted}{haskell}
   checkMajority x y z = do
     (async1, vote1) <- waitAnyExcept [] [x, y, z]  
@@ -110,11 +134,99 @@ With the help of \texttt{Async}, we can now implement the \texttt{checkMajor} fu
       (vote3, async3) <- waitAnyExcept [async1, async2] [x, y, z]
       return vote3
 \end{minted}
+\caption{Check majority}
+\label{fig:check-majority}
+\end{figure}
 
-\subsection{Get the Right Message}
+\subsection{Challenge: Get the Right Message}
 
-The introduction of futures allow communications to happen asynchronously, which implies they may complete in a non-deterministic order at run time.
+The introduction of futures allow communications to happen asynchronously, which implies they may complete in a non-deterministic order.
 %
-This poses a significant challenge to endpoint projection: how can we determine which variable/future a received message corresponds to?
+This poses a significant challenge to endpoint projection: how can we determine which future a received message corresponds to?
 %
-An naive attempt that 
+A naive approach that matches messages and futures on a first-come, first-served basis, as used in standard endpoint projection, may lead to runtime bugs.
+%
+For example, if we project the chreography in \Cref{fig:challenge-chor} to the network programs in \Cref{fig:challenge-net-bug}, a divide-by-zero execption might occur during execution.
+
+\begin{figure}[h]
+  \begin{subfigure}[b]{.4\textwidth}
+    \begin{minted}[autogobble]{haskell}
+      foo = do
+        x <- comm @Alice @Bob 0
+        y <- comm @Alice @Bob 42
+        locally @Bob do
+          (x, y) <- waitBoth x y
+          return (div x y)
+    \end{minted}
+    \caption{Choreography}
+    \label{fig:challenge-chor}
+  \end{subfigure}
+  \begin{subfigure}[b]{.5\textwidth}
+    \begin{minipage}[t]{.4\textwidth}
+      \begin{minted}[autogobble]{haskell}
+        alice = do
+          send @Bob 0
+          send @Bob 42
+      \end{minted}      
+    \end{minipage}
+    \begin{minipage}[t]{.45\textwidth}
+      \begin{minted}[autogobble]{haskell}
+        bob = do
+          x <- recv @Alice
+          y <- recv @Bob
+          (x, y) <- waitBoth x y
+          return (div x y)
+
+      \end{minted}
+    \end{minipage}
+    \caption{Network Programs}
+    \label{fig:challenge-net-bug}
+  \end{subfigure}
+  \caption{A bug cased by not handling out-of-order messages correctly}
+\end{figure}
+
+\noindent The exception occurs in an execution where Bob receives \hs{42}, followed by \hs{0}, and binds them to the variables \hs{x} and \hs{y} respectively.
+%
+This execution is not consistent with the semantics of the original choreography, which specifies that \hs{x} should be \hs{0} and \hs{y} should be \hs{42}.
+
+To address this issue, we tag each message with a unique sequence number to distinguish it from other messages from the same sender, and rely on these numbers to associate received messages with futures.
+%
+For example, \Cref{fig:challenge-net} introduces two abstract sequence numbers, \hs{id1} and \hs{id2}, to enforce the correspondence between \hs{x} and \hs{0}, and \hs{y} and \hs{42}.
+
+\begin{figure}[h]
+  \begin{minipage}[t]{.45\textwidth}
+    \begin{minted}[autogobble]{haskell}
+      alice = do
+        send @Bob 0  id1
+        send @Bob 42 id2
+    \end{minted}      
+  \end{minipage}
+  \begin{minipage}[t]{.45\textwidth}
+    \begin{minted}[autogobble]{haskell}
+      bob = do
+        x <- recv @Alice id1
+        y <- recv @Bob   id2
+        return (div x y)
+    \end{minted}
+  \end{minipage}
+  \caption{Handling out-of-order messages with sequence numbers}
+  \label{fig:challenge-net}
+\end{figure}
+
+The next question is how to generate these sequence numbers. 
+%
+The question boils down to analyzing the communications used in a choreography.
+%
+A fully static approach is impractical because we aim to support higher-order and recursive choreographies, whose exact communication patterns are not fully known until being executed.
+%
+Moreover, a static approach does not fit well with the dynamic endpoint projection, which is used in library-level choreographic programming and happens at run time.
+%
+As a result, we generate sequence numbers dynamically during endpoint projection.
+%
+We maintain a set of counters to track the number of communications between each pair of locations and generate a fresh sequence number using the current value of the relevant counter.
+%
+Each location only needs to maintain a subset of counters that are relevant to them.
+%
+Crucially, because every location shares the same choreography with the same pattern of communication, the counter for each pair of locations stay synchronized, even though they are incremented independently.
+%
+We show the details of the algorithm in \Cref{sec:impl}.
